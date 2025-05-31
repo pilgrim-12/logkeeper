@@ -8,16 +8,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ВРЕМЕННО ОТКЛЮЧАЕМ базу данных для тестирования
-// builder.Services.AddDbContext<LogContext>(options =>
-//     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Добавляем Entity Framework
+builder.Services.AddDbContext<LogContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Добавляем CORS для фронтенда
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://frontend:3000")
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -25,12 +25,37 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ВРЕМЕННО ОТКЛЮЧАЕМ миграцию базы данных
-// using (var scope = app.Services.CreateScope())
-// {
-//     var context = scope.ServiceProvider.GetRequiredService<LogContext>();
-//     context.Database.EnsureCreated();
-// }
+// Автоматическая миграция базы данных при запуске
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<LogContext>();
+
+        // Ждем доступности базы данных
+        var retryCount = 0;
+        while (retryCount < 30)
+        {
+            try
+            {
+                context.Database.EnsureCreated();
+                Console.WriteLine("Database created successfully!");
+                break;
+            }
+            catch (Exception ex)
+            {
+                retryCount++;
+                Console.WriteLine($"Database not ready, retrying... ({retryCount}/30)");
+                Console.WriteLine($"Error: {ex.Message}");
+                Thread.Sleep(2000);
+            }
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Database initialization failed: {ex.Message}");
+}
 
 // Configure the HTTP request pipeline.
 // Включаем Swagger для тестирования

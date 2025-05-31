@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using LogKeeper.API.Data;
 using LogKeeper.API.Models;
+using System.Text.Json;
 
 namespace LogKeeper.API.Controllers
 {
@@ -7,15 +10,18 @@ namespace LogKeeper.API.Controllers
     [Route("api/[controller]")]
     public class LogsController : ControllerBase
     {
-        // Временное хранение в памяти для тестирования
-        private static readonly List<LogEntry> _logs = new();
-        private static int _nextId = 1;
+        private readonly LogContext _context;
+
+        public LogsController(LogContext context)
+        {
+            _context = context;
+        }
 
         // GET: api/logs
         [HttpGet]
-        public ActionResult<IEnumerable<LogEntry>> GetLogs([FromQuery] LogSearchRequest request)
+        public async Task<ActionResult<IEnumerable<LogEntry>>> GetLogs([FromQuery] LogSearchRequest request)
         {
-            var query = _logs.AsQueryable();
+            var query = _context.LogEntries.AsQueryable();
 
             // Фильтрация по уровню
             if (!string.IsNullOrEmpty(request.Level))
@@ -36,24 +42,42 @@ namespace LogKeeper.API.Controllers
                                         (l.Exception != null && l.Exception.Contains(request.SearchTerm)));
             }
 
+            // Фильтрация по дате
+            if (request.FromDate.HasValue)
+            {
+                query = query.Where(l => l.Timestamp >= request.FromDate.Value);
+            }
+
+            if (request.ToDate.HasValue)
+            {
+                query = query.Where(l => l.Timestamp <= request.ToDate.Value);
+            }
+
             // Сортировка по времени (новые первыми)
-            var logs = query.OrderByDescending(l => l.Timestamp).ToList();
+            query = query.OrderByDescending(l => l.Timestamp);
+
+            // Пагинация
+            var totalCount = await query.CountAsync();
+            var logs = await query
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
 
             return Ok(new
             {
                 Data = logs,
-                TotalCount = logs.Count,
+                TotalCount = totalCount,
                 Page = request.Page,
                 PageSize = request.PageSize,
-                TotalPages = 1
+                TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
             });
         }
 
         // GET: api/logs/{id}
         [HttpGet("{id}")]
-        public ActionResult<LogEntry> GetLog(int id)
+        public async Task<ActionResult<LogEntry>> GetLog(int id)
         {
-            var log = _logs.FirstOrDefault(l => l.Id == id);
+            var log = await _context.LogEntries.FindAsync(id);
 
             if (log == null)
             {
@@ -65,50 +89,54 @@ namespace LogKeeper.API.Controllers
 
         // POST: api/logs
         [HttpPost]
-        public ActionResult<LogEntry> CreateLog(CreateLogRequest request)
+        public async Task<ActionResult<LogEntry>> CreateLog(CreateLogRequest request)
         {
             var logEntry = new LogEntry
             {
-                Id = _nextId++,
                 Level = request.Level,
                 Message = request.Message,
                 Source = request.Source,
                 Exception = request.Exception,
                 UserId = request.UserId,
-                Properties = request.Properties != null ? System.Text.Json.JsonSerializer.Serialize(request.Properties) : null,
+                Properties = request.Properties != null ? JsonSerializer.Serialize(request.Properties) : null,
                 Timestamp = DateTime.UtcNow
             };
 
-            _logs.Add(logEntry);
+            _context.LogEntries.Add(logEntry);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetLog), new { id = logEntry.Id }, logEntry);
         }
 
         // DELETE: api/logs/{id}
         [HttpDelete("{id}")]
-        public IActionResult DeleteLog(int id)
+        public async Task<IActionResult> DeleteLog(int id)
         {
-            var log = _logs.FirstOrDefault(l => l.Id == id);
+            var log = await _context.LogEntries.FindAsync(id);
             if (log == null)
             {
                 return NotFound();
             }
 
-            _logs.Remove(log);
+            _context.LogEntries.Remove(log);
+            await _context.SaveChangesAsync();
+
             return NoContent();
         }
 
         // GET: api/logs/stats
         [HttpGet("stats")]
-        public ActionResult GetLogStats()
+        public async Task<ActionResult> GetLogStats()
         {
-            var stats = _logs
+            var stats = await _context.LogEntries
                 .GroupBy(l => l.Level)
                 .Select(g => new { Level = g.Key, Count = g.Count() })
-                .ToList();
+                .ToListAsync();
 
-            var totalCount = _logs.Count;
-            var recentCount = _logs.Count(l => l.Timestamp >= DateTime.UtcNow.AddHours(-24));
+            var totalCount = await _context.LogEntries.CountAsync();
+            var recentCount = await _context.LogEntries
+                .Where(l => l.Timestamp >= DateTime.UtcNow.AddHours(-24))
+                .CountAsync();
 
             return Ok(new
             {
@@ -116,6 +144,33 @@ namespace LogKeeper.API.Controllers
                 RecentLogs = recentCount,
                 LogsByLevel = stats
             });
+        }
+
+        // GET: api/logs/health - для проверки работы контроллера
+        [HttpGet("health")]
+        public async Task<ActionResult> GetHealth()
+        {
+            try
+            {
+                var count = await _context.LogEntries.CountAsync();
+                return Ok(new
+                {
+                    Status = "Healthy",
+                    DatabaseConnected = true,
+                    LogsCount = count,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new
+                {
+                    Status = "Unhealthy",
+                    DatabaseConnected = false,
+                    Error = ex.Message,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
         }
     }
 }

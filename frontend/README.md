@@ -1,46 +1,352 @@
-# Getting Started with Create React App
+# 🗂️ LogKeeper
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**Централизованная система сбора и анализа логов для микросервисной архитектуры**
 
-## Available Scripts
+> 🎯 **Production-ready система логирования** с веб-интерфейсом, REST API и Docker контейнеризацией
 
-In the project directory, you can run:
+## 📋 Описание
 
-### `npm start`
+LogKeeper - это современная система для централизованного сбора логов от различных приложений и сервисов. В отличие от библиотек логирования (Serilog, Winston), LogKeeper **собирает и анализирует логи** в едином интерфейсе.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 🎪 Возможности
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- ✅ **Сбор логов** от .NET, Node.js, Python и других приложений
+- ✅ **Веб-интерфейс** для просмотра и управления логами
+- ✅ **Фильтрация** по уровню, источнику и времени
+- ✅ **REST API** с Swagger документацией
+- ✅ **Docker Compose** для простого развертывания
+- ✅ **SQL Server** база данных для надежного хранения
+- ✅ **Hot reload** для разработки
+- ✅ **Responsive дизайн** для мобильных устройств
 
-### `npm test`
+## 🏗️ Архитектура
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React SPA     │    │   .NET Web API  │    │   SQL Server    │
+│   (Frontend)    │────│   (Backend)     │────│   (Database)    │
+│  Port: 3000     │    │   Port: 5000    │    │   Port: 1433    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+        │                       ▲
+        │              ┌────────┴────────┐
+        │              │                 │
+        ▼              ▼                 ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   Your .NET     │ │   Your Node.js  │ │   Your Python   │
+│   Application   │ │   Application   │ │   Application   │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
 
-### `npm run build`
+## 🚀 Быстрый старт
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Предварительные требования
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) 4.0+
+- Git
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Запуск проекта
 
-### `npm run eject`
+```bash
+# 1. Клонируем репозиторий
+git clone https://github.com/yourusername/logkeeper.git
+cd logkeeper
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+# 2. Запускаем все сервисы одной командой
+docker-compose --profile dev up --build
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# 3. Открываем в браузере
+# Frontend: http://localhost:3000
+# API: http://localhost:5000/swagger
+# Health: http://localhost:5000/health
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+**Вот и всё!** 🎉 Полная система готова к использованию.
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Остановка
 
-## Learn More
+```bash
+docker-compose down
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 📊 Использование
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### 1. Веб-интерфейс
+
+Откройте http://localhost:3000 для:
+
+- ➕ Создания новых логов
+- 📋 Просмотра списка логов
+- 🔍 Фильтрации по уровням
+- 🐛 Просмотра стек трейсов
+
+### 2. REST API
+
+Документация API: http://localhost:5000/swagger
+
+**Создание лога:**
+
+```bash
+curl -X POST http://localhost:5000/api/logs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level": "Error",
+    "message": "Payment processing failed",
+    "source": "PaymentService",
+    "userId": "user123",
+    "exception": "System.TimeoutException: Database timeout"
+  }'
+```
+
+**Получение логов:**
+
+```bash
+curl http://localhost:5000/api/logs
+```
+
+### 3. Интеграция с приложениями
+
+#### .NET + Serilog
+
+```csharp
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.Http("http://localhost:5000/api/logs")
+    .CreateLogger();
+
+Log.Error("Payment failed for order {OrderId}", orderId);
+```
+
+#### Node.js + Winston
+
+```javascript
+const winston = require("winston");
+
+const logger = winston.createLogger({
+  transports: [
+    new winston.transports.Http({
+      host: "localhost",
+      port: 5000,
+      path: "/api/logs",
+    }),
+  ],
+});
+
+logger.error("Authentication failed", { userId: 123 });
+```
+
+## 🛠️ Технологический стек
+
+### Backend
+
+- **.NET 8** Web API
+- **Entity Framework Core** с SQL Server
+- **Swagger/OpenAPI** документация
+- **Docker** контейнеризация
+
+### Frontend
+
+- **React 19** + **TypeScript**
+- **CSS3** адаптивный дизайн
+- **Hot reload** для разработки
+
+### Database
+
+- **SQL Server 2022** Express Edition
+- **Entity Framework** миграции
+- **Индексы** для оптимизации поиска
+
+### DevOps
+
+- **Docker Compose** оркестрация
+- **Multi-stage builds** оптимизация
+- **Health checks** мониторинг
+
+## 📁 Структура проекта
+
+```
+logkeeper/
+├── backend/
+│   └── LogKeeper.API/          # .NET 8 Web API
+│       ├── Controllers/        # API контроллеры
+│       ├── Models/            # Модели данных
+│       ├── Data/              # Entity Framework
+│       └── Dockerfile         # Docker образ API
+├── frontend/                   # React приложение
+│   ├── src/                   # Исходный код React
+│   ├── Dockerfile.dev         # Dev образ
+│   ├── Dockerfile.prod        # Production образ
+│   └── nginx.conf             # Nginx конфигурация
+├── examples/                   # Примеры интеграции
+├── docker-compose.yml         # Оркестрация сервисов
+├── ROADMAP.md                 # План развития
+└── README.md                  # Этот файл
+```
+
+## 🎯 Уровни логов
+
+| Уровень     | Описание              | Цвет       | Пример использования      |
+| ----------- | --------------------- | ---------- | ------------------------- |
+| **Error**   | Критические ошибки    | 🔴 Красный | Исключения, сбои системы  |
+| **Warning** | Предупреждения        | 🟡 Желтый  | Подозрительная активность |
+| **Info**    | Информационные        | 🔵 Синий   | Успешные операции         |
+| **Debug**   | Отладочная информация | ⚪ Серый   | Техническая диагностика   |
+
+## 🔧 Конфигурация
+
+### Переменные окружения
+
+```bash
+# API Configuration
+ASPNETCORE_ENVIRONMENT=Development
+ASPNETCORE_URLS=http://+:8080
+ConnectionStrings__DefaultConnection=Server=database,1433;Database=LogKeeperDB;User Id=sa;Password=LogKeeper2025!;TrustServerCertificate=true
+
+# Database Configuration
+ACCEPT_EULA=Y
+SA_PASSWORD=LogKeeper2025!
+MSSQL_PID=Express
+
+# Frontend Configuration
+REACT_APP_API_URL=http://localhost:5000
+CHOKIDAR_USEPOLLING=true
+```
+
+### Порты
+
+- **3000** - React Frontend (dev)
+- **5000** - .NET API
+- **1433** - SQL Server
+- **80** - Nginx (production)
+
+## 🚀 Развертывание
+
+### Разработка
+
+```bash
+docker-compose --profile dev up --build
+```
+
+### Продакшен
+
+```bash
+docker-compose --profile prod up --build
+```
+
+### Только база данных
+
+```bash
+docker-compose up database
+```
+
+## 🔍 Мониторинг и отладка
+
+### Логи контейнеров
+
+```bash
+# API логи
+docker logs logkeeper-api -f
+
+# Frontend логи
+docker logs logkeeper-frontend-dev -f
+
+# Database логи
+docker logs logkeeper-database -f
+```
+
+### Health checks
+
+- **API**: http://localhost:5000/health
+- **Database**: http://localhost:5000/api/logs/health
+
+### Проверка статуса
+
+```bash
+docker ps
+docker-compose ps
+```
+
+## 🤝 Разработка
+
+### Локальная разработка
+
+```bash
+# Запуск с hot reload
+docker-compose --profile dev up
+
+# Перестройка после изменений
+docker-compose build api
+docker-compose up api -d
+```
+
+### Добавление новых функций
+
+1. Fork репозиторий
+2. Создайте feature branch (`git checkout -b feature/amazing-feature`)
+3. Внесите изменения
+4. Commit (`git commit -m 'Add amazing feature'`)
+5. Push в branch (`git push origin feature/amazing-feature`)
+6. Откройте Pull Request
+
+## 🗺️ Roadmap
+
+Смотрите [ROADMAP.md](ROADMAP.md) для планов развития:
+
+### Ближайшие фазы:
+
+- 🔍 **Advanced Search** - полнотекстовый поиск, фильтры по дате
+- 📊 **Dashboard** - графики, аналитика, статистика
+- 📁 **Export** - экспорт логов в CSV/JSON
+- 🔔 **Alerts** - уведомления о критических ошибках
+
+### Долгосрочные планы:
+
+- ☁️ **Cloud deployment** - AWS, Azure, Kubernetes
+- 🔐 **Authentication** - JWT, RBAC, multi-tenancy
+- 📡 **Real-time** - SignalR, live updates
+- 🤖 **ML Analytics** - аномалии, предиктивная аналитика
+
+## 📝 Changelog
+
+### v1.1.0 (Current)
+
+- ✅ Docker Compose контейнеризация
+- ✅ SQL Server база данных
+- ✅ Hot reload для разработки
+- ✅ Production Dockerfile
+- ✅ Health checks
+
+### v1.0.0
+
+- ✅ .NET 8 Web API
+- ✅ React 19 + TypeScript Frontend
+- ✅ Базовый CRUD для логов
+- ✅ Responsive UI дизайн
+- ✅ In-memory хранение
+
+## 📄 Лицензия
+
+Этот проект распространяется под MIT лицензией. См. [LICENSE](LICENSE) файл для деталей.
+
+## 👨‍💻 Автор
+
+**Ваше Имя** - [@yourusername](https://github.com/yourusername)
+
+**Проект URL:** https://github.com/yourusername/logkeeper
+
+---
+
+## 🆘 Поддержка
+
+Если у вас возникли проблемы:
+
+1. Проверьте [Issues](https://github.com/yourusername/logkeeper/issues)
+2. Создайте новый Issue с описанием проблемы
+3. Приложите логи: `docker logs logkeeper-api`
+
+## ⭐ Поддержите проект
+
+Если LogKeeper оказался полезным, поставьте ⭐ звездочку на GitHub!
+
+---
+
+_Создано с ❤️ для сообщества разработчиков_

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # SQL Server база данных
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: logkeeper-database
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=LogKeeper2025!
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - logkeeper-network
+    restart: unless-stopped
+
+  # .NET API Backend
+  api:
+    build:
+      context: ./backend/LogKeeper.API
+      dockerfile: Dockerfile
+    container_name: logkeeper-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=database,1433;Database=LogKeeperDB;User Id=sa;Password=LogKeeper2025!;TrustServerCertificate=true;MultipleActiveResultSets=true;
+      - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Information
+    ports:
+      - "5000:8080"
+    depends_on:
+      - database
+    networks:
+      - logkeeper-network
+    restart: unless-stopped
+
+  # React Frontend (для разработки)
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: logkeeper-frontend-dev
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - logkeeper-network
+    volumes:
+      # Hot reload для разработки
+      - ./frontend:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    profiles:
+      - dev
+
+networks:
+  logkeeper-network:
+    driver: bridge
+    name: logkeeper-network
+
+volumes:
+  sqlserver_data:
+    name: logkeeper-sqlserver-data
